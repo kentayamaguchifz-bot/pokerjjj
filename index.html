@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>テキサスホールデム 勝率計算ツール</title>
+  <style>
+    :root {
+      --bg-color: #0b1329;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --accent-color: #10b981;
+      --accent-hover: #059669;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      
+      /* スート別カラー */
+      --suit-spade: #0f172a;
+      --suit-heart: #e11d48;
+      --suit-diamond: #2563eb;
+      --suit-club: #16a34a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 15px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      text-align: center;
+      padding: 5px 0;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      color: #38bdf8;
+      margin-bottom: 4px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* ポーカーテーブル */
+    .poker-table {
+      background: radial-gradient(circle, #15803d 0%, #064e3b 100%);
+      border: 8px solid #065f46;
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: 0.95rem;
+      color: #fef08a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: bold;
+    }
+
+    .btn-section-clear {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-section-clear:hover {
+      background: rgba(239, 68, 68, 0.4);
+    }
+
+    .cards-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* 大型化したカードスロット */
+    .card-slot {
+      width: 70px;
+      height: 100px;
+      border: 2px dashed rgba(255,255,255,0.4);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      background: rgba(0,0,0,0.25);
+      transition: all 0.2s;
+      position: relative;
+      user-select: none;
+    }
+
+    .card-slot:hover {
+      border-color: #fef08a;
+      background: rgba(255,255,255,0.15);
+    }
+
+    .card-slot .label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      text-align: center;
+    }
+
+    /* 個別カードの削除ボタン */
+    .slot-remove-btn {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 22px;
+      height: 22px;
+      background: #ef4444;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 12px;
+      font-weight: bold;
+      border: 2px solid white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+      cursor: pointer;
+      z-index: 10;
+      transition: transform 0.1s;
+    }
+
+    .slot-remove-btn:hover {
+      transform: scale(1.15);
+    }
+
+    /* リアル描画カード */
+    .card {
+      width: 100%;
+      height: 100%;
+      background: white;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px;
+      font-weight: bold;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    .card.S { color: var(--suit-spade); }
+    .card.H { color: var(--suit-heart); }
+    .card.D { color: var(--suit-diamond); }
+    .card.C { color: var(--suit-club); }
+
+    .card-corner {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .card-center {
+      font-size: 1.8rem;
+      text-align: center;
+      line-height: 1;
+    }
+
+    /* 対戦人数選択＆コントロール */
+    .controls-panel {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .opponent-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-opp {
+      background: #334155;
+      color: white;
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-opp:hover {
+      background: #475569;
+    }
+
+    .btn-opp.active {
+      background: #38bdf8;
+      color: #0f172a;
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    }
+
+    button.btn-reset {
+      background: #64748b;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button.btn-reset:hover {
+      background: #475569;
+    }
+
+    /* 統合型 Geminiちゃんダッシュボード */
+    .gemini-dashboard {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid #38bdf8;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .gemini-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 12px;
+    }
+
+    .gemini-avatar {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.5rem;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+
+    .gemini-title-area {
+      flex: 1;
+    }
+
+    .gemini-name {
+      font-size: 1.05rem;
+      font-weight: bold;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gemini-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* アクション推奨バッジ */
+    .action-badge {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .action-check { background: #3b82f6; color: white; }
+    .action-call { background: #10b981; color: white; }
+    .action-raise { background: #f59e0b; color: white; }
+    .action-fold { background: #ef4444; color: white; }
+    .action-na { background: #475569; color: #cbd5e1; }
+
+    /* Geminiの一言メッセージ */
+    .gemini-speech {
+      background: rgba(15, 23, 42, 0.6);
+      border-left: 4px solid #38bdf8;
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      color: #f1f5f9;
+    }
+
+    /* 統合スタッツ＆役情報グリッド */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr) 1.2fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 680px) {
+      .dashboard-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .hand-info-card {
+        grid-column: span 3;
+      }
+    }
+
+    .stat-card {
+      background: rgba(15, 23, 42, 0.8);
+      padding: 12px 8px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid var(--card-border);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .stat-win { color: #10b981; }
+    .stat-tie { color: #f59e0b; }
+    .stat-lose { color: #ef4444; }
+
+    /* 現在の役 & ワンチャンス */
+    .hand-info-card {
+      background: rgba(15, 23, 42, 0.8);
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .hand-rank-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .hand-rank-value {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #fef08a;
+    }
+
+    .draws-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .draw-badge {
+      font-size: 0.7rem;
+      background: #1e293b;
+      border: 1px solid #38bdf8;
+      color: #7dd3fc;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* カード選択モーダル */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      padding: 10px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .picker-container {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 720px;
+      width: 100%;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 20px 30px rgba(0,0,0,0.6);
+    }
+
+    .picker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .picker-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .picker-mode-hint {
+      font-size: 0.8rem;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .picker-grid {
+      display: grid;
+      grid-template-columns: repeat(13, 1fr);
+      gap: 5px;
+    }
+
+    .picker-card {
+      aspect-ratio: 2/3;
+      background: white;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.1s, opacity 0.1s, box-shadow 0.1s;
+    }
+
+    .picker-card:hover {
+      transform: scale(1.12);
+      z-index: 5;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    .picker-card.disabled {
+      opacity: 0.15;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .picker-card.S { color: var(--suit-spade); }
+    .picker-card.H { color: var(--suit-heart); }
+    .picker-card.D { color: var(--suit-diamond); }
+    .picker-card.C { color: var(--suit-club); }
+
+    @media (max-width: 600px) {
+      .picker-grid {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+      }
+      .card-slot {
+        width: 58px;
+        height: 84px;
+      }
+      .card-center {
+        font-size: 1.4rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>ホールデムポーカー 勝率計算機</h1>
+    <p>手札・コミュニティカードを選択するとリアルタイムで勝率とアドバイスを表示します</p>
+  </header>
+
+  <div class="poker-table">
+    <!-- 手札 -->
+    <div>
+      <div class="section-header">
+        <div class="section-title">自分の手札 (Hole Cards)</div>
+        <button class="btn-section-clear" onclick="clearHoleCards()">手札クリア</button>
+      </div>
+      <div class="cards-row">
+        <div class="card-slot" id="hole-0" onclick="openPicker('hole', 0)">
+          <span class="label">手札 1</span>
+        </div>
+        <div class="card-slot" id="hole-1" onclick="openPicker('hole', 1)">
+          <span class="label">手札 2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- コミュニティカード -->
+    <div>
+      <div class="section-header">
+        <div class="section-title">コミュニティカード (Board)</div>
+        <button class="btn-section-clear" onclick="clearBoardCards()">ボードクリア</button>
+      </div>
+      <div class="cards-row">
+        <div class="card-slot" id="board-0" onclick="openPicker('board', 0)"><span class="label">Flop 1</span></div>
+        <div class="card-slot" id="board-1" onclick="openPicker('board', 1)"><span class="label">Flop 2</span></div>
+        <div class="card-slot" id="board-2" onclick="openPicker('board', 2)"><span class="label">Flop 3</span></div>
+        <div class="card-slot" id="board-3" onclick="openPicker('board', 3)"><span class="label">Turn</span></div>
+        <div class="card-slot" id="board-4" onclick="openPicker('board', 4)"><span class="label">River</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 対戦人数設定 -->
+  <div class="controls-panel">
+    <div class="control-group">
+      <span style="font-size: 0.9rem; color: var(--text-muted);">対戦相手人数:</span>
+      <div class="opponent-buttons">
+        <button class="btn-opp active" onclick="setOpponents(1)">1人</button>
+        <button class="btn-opp" onclick="setOpponents(2)">2人</button>
+        <button class="btn-opp" onclick="setOpponents(3)">3人</button>
+        <button class="btn-opp" onclick="setOpponents(4)">4人</button>
+        <button class="btn-opp" onclick="setOpponents(5)">5人</button>
+        <button class="btn-opp" onclick="setOpponents(6)">6人</button>
+      </div>
+    </div>
+    <button class="btn-reset" onclick="resetAll()">全リセット</button>
+  </div>
+
+  <!-- 統合型 Geminiちゃんダッシュボード -->
+  <div class="gemini-dashboard">
+    <div class="gemini-header">
+      <div class="gemini-avatar">✨</div>
+      <div class="gemini-title-area">
+        <div class="gemini-name">
+          Geminiちゃんのアドバイス
+        </div>
+        <div class="gemini-status" id="sim-status">手札を2枚選択してください</div>
+      </div>
+      <div class="action-badge action-na" id="action-badge">N/A</div>
+    </div>
+
+    <!-- Geminiの一言メッセージ -->
+    <div class="gemini-speech" id="gemini-speech">
+      自分の手札を2枚選んでね！勝率とおすすめの立ち回りを計算するよ。
+    </div>
+
+    <!-- 勝率・役・ドロー確率統合グリッド -->
+    <div class="dashboard-grid">
+      <div class="stat-card">
+        <div class="stat-label">勝率 (Win)</div>
+        <div class="stat-value stat-win" id="win-rate">N/A</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">引き分け (Tie)</div>
+        <div class="stat-value stat-tie" id="tie-rate">N/A</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">敗北率 (Lose)</div>
+        <div class="stat-value stat-lose" id="lose-rate">N/A</div>
+      </div>
+
+      <!-- 現在の役 & ワンチャンス -->
+      <div class="hand-info-card">
+        <div>
+          <div class="hand-rank-title">現在の役 (Made Hand)</div>
+          <div class="hand-rank-value" id="current-hand-rank">-</div>
+        </div>
+        <div>
+          <div class="hand-rank-title">ワンチャンス (Draws / Outs)</div>
+          <div class="draws-container" id="draws-container">
+            <span class="draw-badge" style="border-color:#475569; color:#94a3b8;">なし</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- カード選択モーダル -->
+<div class="modal-overlay" id="picker-modal" onclick="onOverlayClick(event)">
+  <div class="picker-container" onclick="event.stopPropagation()">
+    <div class="picker-header">
+      <div class="picker-title-group">
+        <h3>カードを選択</h3>
+        <span class="picker-mode-hint" id="picker-hint">1枚選択</span>
+      </div>
+      <div>
+        <button onclick="clearCurrentSlot()" style="background:#ef4444; color:white; border:none; padding:5px 12px; border-radius:6px; font-size:0.8rem; cursor:pointer; margin-right:6px;">枠を空にする</button>
+        <button onclick="closePicker()" style="background:#64748b; color:white; border:none; padding:5px 12px; border-radius:6px; font-size:0.8rem; cursor:pointer;">閉じる</button>
+      </div>
+    </div>
+    <div class="picker-grid" id="picker-grid"></div>
+  </div>
+</div>
+
+<script>
+  const SUITS = [
+    { code: 'S', symbol: '♠' },
+    { code: 'H', symbol: '♥' },
+    { code: 'D', symbol: '♦' },
+    { code: 'C', symbol: '♣' }
+  ];
+  // 表示用ランク ('T' -> '10')
+  const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const RANK_VALUES = {'2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13, 'A':14};
+
+  // 状態管理
+  let holeCards = [null, null];
+  let boardCards = [null, null, null, null, null];
+  let numOpponents = 1;
+  let currentTarget = null; // { type: 'hole'|'board', index: number }
+  let autoCalcTimer = null;
+
+  // モーダル背景クリックで閉じる
+  function onOverlayClick(e) {
+    if (e.target.id === 'picker-modal') {
+      closePicker();
+    }
+  }
+
+  // 対戦人数の設定
+  function setOpponents(num) {
+    numOpponents = num;
+    document.querySelectorAll('.btn-opp').forEach((btn, idx) => {
+      if (idx + 1 === num) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    triggerAutoCalculate();
+  }
+
+  // カード選択ピッカーの構築
+  function initPicker() {
+    const grid = document.getElementById('picker-grid');
+    grid.innerHTML = '';
+
+    SUITS.forEach(suit => {
+      RANKS.forEach((rank) => {
+        const cardVal = rank + suit.code;
+        const cardEl = document.createElement('div');
+        cardEl.className = `picker-card ${suit.code}`;
+        cardEl.dataset.card = cardVal;
+        cardEl.innerHTML = `
+          <div>${rank}</div>
+          <div style="text-align:center;">${suit.symbol}</div>
+        `;
+        cardEl.onclick = () => selectCard(cardVal);
+        grid.appendChild(cardEl);
+      });
+    });
+  }
+
+  function openPicker(type, index) {
+    currentTarget = { type, index };
+    const modal = document.getElementById('picker-modal');
+    const hintEl = document.getElementById('picker-hint');
+
+    // モード案内
+    if (type === 'hole') {
+      hintEl.textContent = `手札を選択中 (${index + 1}/2枚目)`;
+    } else if (type === 'board' && index <= 2) {
+      hintEl.textContent = `フロップを選択中 (${index + 1}/3枚目)`;
+    } else {
+      hintEl.textContent = type === 'board' && index === 3 ? 'ターンを選択中' : 'リバーを選択中';
+    }
+    
+    updatePickerDisabledCards();
+    modal.classList.add('active');
+  }
+
+  function updatePickerDisabledCards() {
+    const usedCards = [...holeCards, ...boardCards].filter(c => c !== null);
+    document.querySelectorAll('.picker-card').forEach(el => {
+      const card = el.dataset.card;
+      if (usedCards.includes(card)) {
+        el.classList.add('disabled');
+      } else {
+        el.classList.remove('disabled');
+      }
+    });
+  }
+
+  function closePicker() {
+    document.getElementById('picker-modal').classList.remove('active');
+    currentTarget = null;
+  }
+
+  function selectCard(card) {
+    if (!currentTarget) return;
+    const usedCards = [...holeCards, ...boardCards].filter(c => c !== null);
+    if (usedCards.includes(card)) return;
+
+    if (currentTarget.type === 'hole') {
+      holeCards[currentTarget.index] = card;
+      updateUI();
+
+      // 連続選択：手札1枚目を選んだら自動で2枚目の選択へ
+      if (currentTarget.index === 0 && holeCards[1] === null) {
+        currentTarget = { type: 'hole', index: 1 };
+        document.getElementById('picker-hint').textContent = '手札を選択中 (2/2枚目)';
+        updatePickerDisabledCards();
+        return;
+      }
+    } else {
+      boardCards[currentTarget.index] = card;
+      updateUI();
+
+      // 連続選択：フロップ1・2枚目を選んだら次スロットへ
+      if (currentTarget.index < 2 && boardCards[currentTarget.index + 1] === null) {
+        const nextIndex = currentTarget.index + 1;
+        currentTarget = { type: 'board', index: nextIndex };
+        document.getElementById('picker-hint').textContent = `フロップを選択中 (${nextIndex + 1}/3枚目)`;
+        updatePickerDisabledCards();
+        return;
+      }
+    }
+
+    closePicker();
+  }
+
+  function removeCard(type, index, event) {
+    if (event) event.stopPropagation();
+    if (type === 'hole') {
+      holeCards[index] = null;
+    } else {
+      boardCards[index] = null;
+    }
+    updateUI();
+  }
+
+  function clearHoleCards() {
+    holeCards = [null, null];
+    updateUI();
+  }
+
+  function clearBoardCards() {
+    boardCards = [null, null, null, null, null];
+    updateUI();
+  }
+
+  function clearCurrentSlot() {
+    if (!currentTarget) return;
+    if (currentTarget.type === 'hole') {
+      holeCards[currentTarget.index] = null;
+    } else {
+      boardCards[currentTarget.index] = null;
+    }
+    updateUI();
+    closePicker();
+  }
+
+  function resetAll() {
+    holeCards = [null, null];
+    boardCards = [null, null, null, null, null];
+    updateUI();
+  }
+
+  function renderCard(cardVal) {
+    if (!cardVal) return '';
+    const suitCode = cardVal.slice(-1);
+    const rank = cardVal.slice(0, -1);
+    const suitObj = SUITS.find(s => s.code === suitCode);
+    return `
+      <div class="card ${suitCode}">
+        <div class="card-corner">${rank}${suitObj.symbol}</div>
+        <div class="card-center">${suitObj.symbol}</div>
+      </div>
+    `;
+  }
+
+  function updateUI() {
+    holeCards.forEach((card, i) => {
+      const el = document.getElementById(`hole-${i}`);
+      if (card) {
+        el.innerHTML = renderCard(card) + `<div class="slot-remove-btn" onclick="removeCard('hole', ${i}, event)">✕</div>`;
+      } else {
+        el.innerHTML = `<span class="label">手札 ${i+1}</span>`;
+      }
+    });
+
+    const boardLabels = ['Flop 1', 'Flop 2', 'Flop 3', 'Turn', 'River'];
+    boardCards.forEach((card, i) => {
+      const el = document.getElementById(`board-${i}`);
+      if (card) {
+        el.innerHTML = renderCard(card) + `<div class="slot-remove-btn" onclick="removeCard('board', ${i}, event)">✕</div>`;
+      } else {
+        el.innerHTML = `<span class="label">${boardLabels[i]}</span>`;
+      }
+    });
+
+    triggerAutoCalculate();
+  }
+
+  // --- デバウンス付き自動勝率計算 ---
+  function triggerAutoCalculate() {
+    const validHole = holeCards.filter(c => c !== null);
+    if (validHole.length < 2) {
+      document.getElementById('win-rate').textContent = 'N/A';
+      document.getElementById('tie-rate').textContent = 'N/A';
+      document.getElementById('lose-rate').textContent = 'N/A';
+      document.getElementById('sim-status').textContent = '手札を2枚選択してください';
+      document.getElementById('current-hand-rank').textContent = '-';
+      document.getElementById('draws-container').innerHTML = `<span class="draw-badge" style="border-color:#475569; color:#94a3b8;">なし</span>`;
+      
+      const badge = document.getElementById('action-badge');
+      badge.textContent = 'N/A';
+      badge.className = 'action-badge action-na';
+      document.getElementById('gemini-speech').textContent = '自分の手札を2枚選んでね！勝率とおすすめの立ち回りを計算するよ。';
+      return;
+    }
+
+    document.getElementById('sim-status').textContent = '計算中...';
+    clearTimeout(autoCalcTimer);
+    autoCalcTimer = setTimeout(() => {
+      calculateOdds();
+    }, 150);
+  }
+
+  // --- ポーカー評価 & シミュレーションエンジン ---
+
+  function evaluate7Cards(cards) {
+    const parsed = cards.map(c => ({ rank: RANK_VALUES[c.slice(0, -1)], suit: c.slice(-1) }));
+    let maxScore = 0;
+    const combinations = getKCombinations(parsed, 5);
+
+    for (const combo of combinations) {
+      const score = evaluate5Cards(combo);
+      if (score > maxScore) maxScore = score;
+    }
+    return maxScore;
+  }
+
+  function getKCombinations(arr, k) {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+    const head = arr[0];
+    const tail = arr.slice(1);
+    const withHead = getKCombinations(tail, k - 1).map(c => [head, ...c]);
+    const withoutHead = getKCombinations(tail, k);
+    return [...withHead, ...withoutHead];
+  }
+
+  function evaluate5Cards(cards) {
+    cards.sort((a,b) => b.rank - a.rank);
+    const isFlush = cards.every(c => c.suit === cards[0].suit);
+    
+    let isStraight = false;
+    let straightHigh = 0;
+
+    if (cards[0].rank - cards[4].rank === 4 && new Set(cards.map(c=>c.rank)).size === 5) {
+      isStraight = true;
+      straightHigh = cards[0].rank;
+    } else if (cards[0].rank === 14 && cards[1].rank === 5 && cards[2].rank === 4 && cards[3].rank === 3 && cards[4].rank === 2) {
+      isStraight = true;
+      straightHigh = 5;
+    }
+
+    const counts = {};
+    cards.forEach(c => counts[c.rank] = (counts[c.rank] || 0) + 1);
+    const countPairs = Object.entries(counts).map(([r, c]) => ({ rank: Number(r), count: c }));
+    countPairs.sort((a,b) => b.count - a.count || b.rank - a.rank);
+
+    let category = 0;
+    if (isFlush && isStraight) category = 8;
+    else if (countPairs[0].count === 4) category = 7;
+    else if (countPairs[0].count === 3 && countPairs[1].count === 2) category = 6;
+    else if (isFlush) category = 5;
+    else if (isStraight) category = 4;
+    else if (countPairs[0].count === 3) category = 3;
+    else if (countPairs[0].count === 2 && countPairs[1].count === 2) category = 2;
+    else if (countPairs[0].count === 2) category = 1;
+    else category = 0;
+
+    let tieBreakers = (category === 4 || category === 8) ? [straightHigh] : countPairs.map(p => p.rank);
+
+    let score = category * Math.pow(15, 6);
+    tieBreakers.forEach((val, idx) => {
+      score += val * Math.pow(15, 5 - idx);
+    });
+
+    return score;
+  }
+
+  // カテゴリIDから役名称の取得
+  function getHandCategoryName(score) {
+    const cat = Math.floor(score / Math.pow(15, 6));
+    const names = [
+      'ハイカード', 'ワンペア', 'ツーペア', 'スリーカード', 
+      'ストレート', 'フラッシュ', 'フルハウス', 'フォーカード', 'ストレートフラッシュ'
+    ];
+    return names[cat] || 'ハイカード';
+  }
+
+  // ドロー・ワンチャンスの検出
+  function detectDraws(cards) {
+    if (cards.length < 5) return [];
+    const draws = [];
+    const suits = {}, ranks = {};
+    cards.forEach(c => {
+      const suit = c.slice(-1);
+      const rank = RANK_VALUES[c.slice(0, -1)];
+      suits[suit] = (suits[suit] || 0) + 1;
+      ranks[rank] = (ranks[rank] || 0) + 1;
+    });
+
+    // フラッシュドロー
+    Object.values(suits).forEach(count => {
+      if (count === 4) draws.push('フラッシュドロー');
+    });
+
+    // ストレートドロー (簡易判定)
+    const uniqueRanks = Object.keys(ranks).map(Number).sort((a,b)=>a-b);
+    if (uniqueRanks.includes(14)) uniqueRanks.unshift(1); // Ace-low
+    for (let i = 0; i <= uniqueRanks.length - 4; i++) {
+      const window = uniqueRanks.slice(i, i + 4);
+      if (window[3] - window[0] === 3 && new Set(window).size === 4) {
+        draws.push('オープンエンドストレートドロー');
+        break;
+      } else if (window[3] - window[0] === 4) {
+        draws.push('ガットショットストレートドロー');
+        break;
+      }
+    }
+
+    // セット／トリップス狙い
+    const pairs = Object.values(ranks).filter(c => c === 2).length;
+    if (pairs > 0 && cards.length < 7) {
+      draws.push('セット/トリップスチャンス');
+    }
+
+    return Array.from(new Set(draws));
+  }
+
+  // シミュレーション実行
+  function calculateOdds() {
+    const knownCards = [...holeCards, ...boardCards].filter(c => c !== null);
+    const fullDeck = [];
+    SUITS.forEach(s => RANKS.forEach(r => fullDeck.push(r + s.code)));
+    const remainingDeck = fullDeck.filter(c => !knownCards.includes(c));
+
+    const boardKnown = boardCards.filter(c => c !== null);
+    const boardNeeded = 5 - boardKnown.length;
+
+    let wins = 0, ties = 0, losses = 0;
+    const SIMULATIONS = 1500;
+
+    for (let i = 0; i < SIMULATIONS; i++) {
+      const deck = [...remainingDeck];
+      for (let j = deck.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [deck[j], deck[k]] = [deck[k], deck[j]];
+      }
+
+      const simBoard = [...boardKnown];
+      for (let b = 0; b < boardNeeded; b++) {
+        simBoard.push(deck.pop());
+      }
+
+      const myScore = evaluate7Cards([...holeCards, ...simBoard]);
+
+      let maxOppScore = 0;
+      for (let op = 0; op < numOpponents; op++) {
+        const opHole = [deck.pop(), deck.pop()];
+        const opScore = evaluate7Cards([...opHole, ...simBoard]);
+        if (opScore > maxOppScore) maxOppScore = opScore;
+      }
+
+      if (myScore > maxOppScore) wins++;
+      else if (myScore === maxOppScore) ties++;
+      else losses++;
+    }
+
+    const winP = (wins / SIMULATIONS) * 100;
+    const tieP = (ties / SIMULATIONS) * 100;
+    const loseP = (losses / SIMULATIONS) * 100;
+
+    document.getElementById('win-rate').textContent = `${winP.toFixed(1)}%`;
+    document.getElementById('tie-rate').textContent = `${tieP.toFixed(1)}%`;
+    document.getElementById('lose-rate').textContent = `${loseP.toFixed(1)}%`;
+    document.getElementById('sim-status').textContent = `(${SIMULATIONS.toLocaleString()} 回の試行結果)`;
+
+    // 現在の役とワンチャンスの更新
+    const currentScore = evaluate7Cards(knownCards);
+    document.getElementById('current-hand-rank').textContent = getHandCategoryName(currentScore);
+
+    const draws = detectDraws(knownCards);
+    const drawsContainer = document.getElementById('draws-container');
+    if (draws.length > 0) {
+      drawsContainer.innerHTML = draws.map(d => `<span class="draw-badge">${d}</span>`).join('');
+    } else {
+      drawsContainer.innerHTML = `<span class="draw-badge" style="border-color:#475569; color:#94a3b8;">なし</span>`;
+    }
+
+    // Geminiのアドバイス＆推奨アクションの更新
+    updateGeminiAdvice(winP, boardKnown.length);
+  }
+
+  // Geminiちゃんのアドバイスロジック
+  function updateGeminiAdvice(winRate, boardCount) {
+    const badge = document.getElementById('action-badge');
+    const speech = document.getElementById('gemini-speech');
+
+    // 期待値の基準目安（人数に応じて調整）
+    const fairRate = 100 / (numOpponents + 1);
+
+    if (winRate >= fairRate * 1.8) {
+      badge.textContent = 'RAISE';
+      badge.className = 'action-badge action-raise';
+      speech.textContent = `勝率${winRate.toFixed(1)}%！絶好の手札だよ。強気にレイズしてポットを大きく育てよう！`;
+    } else if (winRate >= fairRate * 1.1) {
+      badge.textContent = 'CALL';
+      badge.className = 'action-badge action-call';
+      speech.textContent = `勝率${winRate.toFixed(1)}%で平均より有利！相手のベットにはしっかりコールでついていこう。`;
+    } else if (winRate >= fairRate * 0.7) {
+      badge.textContent = 'CHECK';
+      badge.className = 'action-badge action-check';
+      speech.textContent = `勝率${winRate.toFixed(1)}%の五分五分くらい。安く次のカード（ボード）を見に行こう！`;
+    } else {
+      badge.textContent = 'FOLD';
+      badge.className = 'action-badge action-fold';
+      speech.textContent = `勝率${winRate.toFixed(1)}%で少し厳しいかも。相手から大きなレイズが来たら素直にフォールド（降参）も検討してね！`;
+    }
+  }
+
+  // 初期化
+  initPicker();
+</script>
+
+</body>
+</html>
